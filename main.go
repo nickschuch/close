@@ -1,60 +1,97 @@
 package main
 
 import (
+	"strings"
+	"strconv"
+	"net/http"
+
 	"gopkg.in/alecthomas/kingpin.v1"
 	"github.com/google/go-github/github"
-	"github.com/samalba/dockerclient"
+	log "github.com/Sirupsen/logrus"
+
+	"github.com/nickschuch/close/backend"
+	_ "github.com/nickschuch/close/backend/docker"
+	_ "github.com/nickschuch/close/backend/ecs"
 )
 
 var (
-	username = kingpin.Flag("user", "The Github account username.").Required().String()
-	password = kingpin.Flag("pass", "The Github account password.").Required().String()
-	env      = kingpin.Flag("env", "The Github account password.").Default("ISSUE_URL").String()
-	docker   = kingpin.Flag("docker", "The Docker endpoint.").Default("unix:///var/run/docker.sock").String()
+	cliUsername = kingpin.Flag("user", "The Github account username.").Required().String()
+	cliPassword = kingpin.Flag("pass", "The Github account password.").Required().String()
+	cliEnv      = kingpin.Flag("env", "The Github account password.").Default("ISSUE_URL").String()
+	cliBackend  = kingpin.Flag("backend", "The type of backend.").Default("docker").String()
 )
 
-func main() {
-    kingpin.Version("0.0.1")
-	kingpin.CommandLine.Help = "Remove Docker containers if Pull Request status is closed."
-	kingpin.Parse() 
+type Transport struct {
+	Username string
+	Password string
+}
 
-	// Build a client with a token that we can use for
-	// authentication.
+func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.SetBasicAuth(t.Username, t.Password)
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+func (t *Transport) Client() *http.Client {
+	return &http.Client{Transport: t}
+}
+
+func main() {
+  kingpin.Version("0.0.1")
+	kingpin.CommandLine.Help = "Remove containers if a Pull Request status is closed."
+	kingpin.Parse()
+
+	// Get a list of all the environments from backend.
+	b, err := backend.New(*cliBackend)
+	if err != nil {
+		log.Fatalf("Cannot find the backend: %v", *cliBackend)
+	}
+
+	// Loop over and check if they are still open.
+	list := b.List(*cliEnv)
+	for i, l := range list {
+		closed := checkIssue(l)
+		if ! closed {
+			continue
+		}
+
+		// Close the environment with the backend indicator.
+		b.Close(i)
+
+		// Print it out to the screen for accountability.
+		log.Println("Closed: %v", l)
+	}
+}
+
+func checkIssue(url string) bool {
+	// Build a client with a token that we can use for authentication.
 	t := &Transport{
-		Username: *username,
-		Password: *password,
+		Username: *cliUsername,
+		Password: *cliPassword,
 	}
 	clientGithub := github.NewClient(t.Client())
 
-	// Get a connection to the Docker instance.
-	clientDocker, err := dockerclient.NewDockerClient(*docker, nil)
-	check(err)
-
-	// Loop over containers.
-	containers, err := clientDocker.ListContainers(false, false, "")
-	check(err)
-
-	// Check if container has environment variable.
-	for _, c := range containers {
-		container, _ := clientDocker.InspectContainer(c.Id)
-
-		// We try to find the domain environment variable. If we don't have one
-		// then we have nothing left to do with this container.
-		url := getContainerEnv(*env, container.Config.Env)
-		if len(url) <= 0 {
-			continue
-		}
-
-		owner, repo, number := sliceUrl(url)
-	    issue, _, err := clientGithub.Issues.Get(owner, repo, number)
-	    check(err)
-
-		// If the Pull Request is no closed then we have nothing left to do with
-		// this container.
-		if *issue.State != "closed" {
-			continue
-		}
-
-		clientDocker.RemoveContainer(container.Id, true, true)
+	owner, repo, number := sliceUrl(url)
+	issue, _, err := clientGithub.Issues.Get(owner, repo, number)
+	if err != nil {
+		log.Fatalf("Failed to get the Github issue: %v", err)
 	}
+
+	// If the Pull Request is not closed then we have nothing left to do with
+	// this container.
+	if *issue.State != "closed" {
+		return false
+	}
+
+	return true
+}
+
+func sliceUrl(u string) (string, string, int) {
+  slice := strings.Split(u, "/")
+  owner := slice[3]
+  repo := slice[4]
+  number, err := strconv.Atoi(slice[6])
+  if err != nil {
+		log.Fatalf("Cannot convert the issue to a number")
+	}
+  return owner, repo, number
 }

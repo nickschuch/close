@@ -1,5 +1,4 @@
-package main
-
+package docker_backend
 
 import (
 	"github.com/stretchr/testify/assert"
