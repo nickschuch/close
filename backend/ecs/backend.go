@@ -21,12 +21,14 @@ func init() {
 }
 
 func (o *ECSBackend) List(id string) map[string]string {
-  var list map[string]string
+  list := make(map[string]string)
 
   client := getECSClient()
 
   // Get the list of task ID's which we can use to query for all the information.
-  tasksInput := &ecs.ListTasksInput{}
+  tasksInput := &ecs.ListTasksInput{
+    Cluster: aws.String(*cliECSCluster),
+  }
 	tasks, err := client.ListTasks(tasksInput)
   if err != nil {
 		log.Fatalf("Cannot get a list of containers from the ECS backend.")

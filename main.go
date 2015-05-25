@@ -58,7 +58,7 @@ func main() {
 		b.Close(i)
 
 		// Print it out to the screen for accountability.
-		log.Println("Closed: %v", l)
+		log.Println("Closed: ", l)
 	}
 }
 
