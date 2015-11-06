@@ -1,9 +1,0 @@
-gopkg.in/alecthomas/kingpin.v1   55a69a226d28a43b913720f5d765706d49c8fa9e
-github.com/alecthomas/units      6b4e7dc5e3143b85ea77909c72caf89416fc2915
-github.com/samalba/dockerclient  adc6ab28ecbe4ab3b6bd04c68cbf8fa9b21a2684
-github.com/stretchr/testify      e22aedd37671fb115be6c0c25129c405cb575cfd
-github.com/awslabs/aws-sdk-go    9214b8dd48ef351976b0af5de3eacfa8ba052177
-github.com/vaughan0/go-ini       a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
-github.com/google/go-github      4da7e49b0b4273d0becd418b24a2f49f5c56bd66
-github.com/google/go-querystring 547ef5ac979778feb2f760cdb5f4eae1a2207b86
-github.com/Sirupsen/logrus       aaf92c95712104318fc35409745f1533aa5ff327
